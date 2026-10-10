@@ -152,5 +152,98 @@ Por su parte, la ´´´Explitacion´´´, es el hallazgo prometedor, si se inten
 
 Para validad y explotar un hallzago de forma responsable, es crucial evitar acciones que puedan dañar el sistema de produccion o comprometer datos sensibles. En su lugar, se recomienda centrarse en crear una ´´´prueba de concepto (PoC)´´´ que demuestre la existencia de la vuln sin causar daños. Por ejemplo, si sospechas de una vuln de ´´´inyeccion SQL´´´ (´´´SQL Injeccion´´´), se podria elaborar una consulta SQL inofensiva que devuelva la cadena de version del servidor SQL en su lugar de intentar extraer o modificar datos sensibles.
 
+
 ## Api web
 Una ´´´API web´´´ (o ´´´Web API´´´, del ingles ´´´Web Aplication Programming Interface´´´) es un conjunto de reglas y especificaciones que permiten a diferentes aplicaciones de software comunicarse a traver de la Web.
+Esencialmente, una ´´´API web´´´ sirve como un puente entre un servidor (que loja los datos y la funcionalidad) y un cliente (como un navegador web, una aplicacion movil u otro servidor) que desea acceder o utilizar esos datos o funcionalidad.
+
+## Transferencia de Estado Representacional (REST)
+Las ´´´API REST´´´ son un estilo arquitectonico popular para construir servicios web. Utilizan un modelo de comunicacion cliente-servidor sin estado en el que los clientes envian solicitudes a los servidores para acceder o manipular recursos. Las API REST utilizan ´´´metodos HTTP´´´ estandar (´´´GET, POST, PUT, DELETE) para realizar operaciones ´´´CRUD´´´ (Crear, Leer, Actualizar, Borrar) en recursos identificados por URL unicas. Normalmente intercambian datos en formatos ligeros como ´´´JSON o XML´´´, lo que las hace faciles de integrar con diversas aplicaciones plataformas.
+
+## Protocolo Simple de Acceso a Objetos (SOAP)
+Las ´´´API SOAP´´´ siguen un protocolo mas formas y estandarizado para intercambiar informacion. Utilizan ´´´XML´´´ para definir mensajes, que luego se encapsulan en ´´´Sobres SOAP´´´ y se trensmiten a traver de protocolos de red como ´´´HTTP´´´ o ´´´SMTP´´´. Este tipo de API a menudo incluyen caracteristicas integradas de seguridad, fiabilidad y gestion de transacciones, las que las hace adecuadas para aplicaciones de un enfoque mas empresarial que requieren una estructura integrada de datos y manejo de errores.
+
+**Consulta de ejemplo**: 
+```xml
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
+   <soapenv:Header/>
+   <soapenv:Body>
+      <tem:GetStockPrice>
+         <tem:StockName>AAPL</tem:StockName>
+      </tem:GetStockPrice>
+   </soapenv:Body>
+</soapenv:Envelope> 
+```
+## GraphQL
+´´´GraphQL´´´ es un lenguaje de consulta y un entorno de ejecucion para API relativamente nuevo. A diferencia de las API REST, que exponen multiples endpints para diferentes recursos, este software propociona un unico endpoint donde los clientes pueden solicitar los datos que necesitan utilizando un lenguaje de consulta felxible. Esto elimina el problema el defecto de la obtencion de datos, que se comun en las API REST. Las fuertes capacidades de tipado e introspeccion de ´´´GraphQL´´´ que facilita la evolucion de las API a lo largo del tiempo sin romper los clientes existentes, lo que lo convierte en una mejor opcion para las aplicaciones web o moviles modernas.
+```grapgql
+query { 
+    user(id: 123) {
+           name
+           email
+       }
+}
+```
+## Identifiacion de endpoints
+### REST
+Las API REST se basan en el concepto de recursos, que se identifican mediante URL unicas llamadas endpoints. Estos mismo son los objetivos de las solicitudes de los clientes y, a menudo, incluten parametros para proporcionar un contexto adicional o control sobre la operacion realizada.
+
+Los endpoints en las API REST se estructuran como URL que representan los recursos a los que se desea acceder o manipular. POr ejemplo:
+
+- ```/user``` -> Representa una coleccion de recursos de usuario.
+- ```/user/123``` -> Representa un usuario especifico con el ID 123.
+- ```/products``` -> Representa una coleccion de recursos de producto.
+- ```/products/456``` -> Representa un producto especifiico con el ID 456.
+
+Los parametros se utilizan para modificar el comportamiento de las solicitudes de la API o para proporcionar informacion adicional. En las API REST, existen varios tipos de parametros:
+| Tipo de Parametro | Descripcion | Ejemplo |
+| --- | --- | --- |
+| Parametros de consulta | Se añaden a la URL del endpoint despues de un signo de interrogacion (```?```). Se utilizan para filtrar, ordenar o paginar. | ```/users?limit=10&sort=name``` |
+| Parametros de ruta | Incrustacion directamente en la URL edl endpoint. Se utilizan para identificar recursos especificos. | ```/productos/{id}``` |
+| Parametros del cuerpo de la solicitud | Se envian en el cuerpo de las solicitudes POST, PUT o PATCH. Se utilizan para crear o actualizar recursos. | ```{ "name": "New Product", "price": 99.99``` |
+
+## Descubrimiento de endpoint y parametros REST
+1.- ```Documentacion de la API```: La forma mas fiable de entender una API es consultar su documentacion oficial. Esta documentacion suele incluir unalista de los endpoints disponibles, sus parametros, los formatos de la solicitud/respuesta esperados y ejemplos de uso. Busque especificaciones como Swagger (OpenAPI) o RAML, que proporcionan descripciones de la API legible por maquina.
+2.- ```Analisis de trafico de red```: Si la documentacion no esta disponible o es incompleta, puede analizar el trafico de red para observar como se utiliza la API. Herraminetas como Burp Suite o las de desarrollador del navegador le permiten interceptar e inspeccionar las solicitudes y respuestas de la API, revelando enpoints, parametros y formatos de datos.
+3.- ```Fuzzing de nombres de parametros```: De forma similar el fuzzing de directorios y archivos, puede utilizar las mismas herrmientas y tecnicas para hacer ```fuzzing``` de nombres de parametros dentro de las solicitudes API. ```ffuf``` y ```wfuzz```, combinados con las wordlist adecuadas, pueden utilizarse para descubrir parametros ocultos o no dumentados.
+
+## SOAP
+Las API SOAP (Simple Object Access Protocol) tienen una estructura diferente a la de las API REST. Se basan en mensajes basados en XML y en archvios del Lenguaje de Descripcion de Servicios Web (WSDL, por sus siglas en ingles) para inferir sus interfaces y operaciones.
+
+A diferencia de las API REST, que utilizan URL distintas para cada resurso, las API SOAP suelen exponer un unico endpoint. Este endpoint es una URL donde el servidor SOAP escucha las solicitudes entrantes. El contenido del propio mensaje SOAP determian la operacion especifica que se desea realizar.
+
+## Descubrimiento de endpoints y parametros SOAP
+Para identificar los endpoint (operacionales) y paramtros disponibles para una SOAP, se utilizan los siguientes metodos:
+
+1.- ```Analisis del WSDL```: el archivo WSDL es el recurso mas valioso para entender una API SOAP. Describe:
+- Operaciones disponibles (endpoints)
+- Parametros de entrada para cada operacion (tipos de mensaje, elementos y atributos)
+- Parametros de salida para cada operacion (tipos de mensaje de respuesta)
+- Tipos de datos utilizados para los parametros (p. ej., cadenas, enteros, tipos completos)
+- La ubicacion (URL) del SOAP
+2.- ```Analisis de trafico de red```: De forma similiar a las API REST, se pueden interceptar y analizar el trafico SOAP para observar las solicitudes y respuestas entre los clientes y el servidor.
+Herraminetas como Wbireshark o tcpdump pueden interceptar el trafico SOAP.
+3.- ```Fuzzing de nombres y valores```:  Aunque las API SOAP suelen tener una estructira bien definida, el fuzzing puede ser util para descubrir operaciones o parametros ocultos o no documentados. Pueden utilizar herramientas de fuzzing para enviar valores malformados o inesperados dentro de las solicitudes SOAP y ver como responde el serv.
+
+## Identificacion de endpiints y parametros de la API GraphQL
+A diferencia de las API REST o SOAP, que qa menudo exponen multiples endpoints para diferenntes recursos, las API GraphQL suelen tener un unico endpoint. Este suele ser una URL como ```/graphql``` y sirve como punto de entrada para todas las consultas (queries) y mutaciones (mutations) enviadas a la API.
+
+## Mutaciones (Mutations) de GraphQL
+Las mutaciones son las contrapartes de las consultas, diseñadas para modificar datos en el servidor. 
+Abarcan operaciones para crear, actualizar o eliminar datos. Al igual que las consultas, las mutaciones tambien pueden aceptar argumentos para definir los valores de entrada para estas operaciones.
+
+| Componentes | Descripcion | Ejemplo | 
+| --- | --- | --- | 
+| Operacion | La accion a realizar (p. ej., createPost, updateUser, deleteComment) | ```createPost``` |
+| Argumento | Datos de entrada necesarios para la operacion (p. ej., titulo y cuerpo para una nueva publicacion). | ```title: "New Post", body: "This is the content of the new posT"``` |
+| Seleccion | Campos que desea recuperar en la respuesta una vez completada la mutacion (p. ej., id, titulo de la nueva publicacion). | ```id```, ```title``` | 
+
+**Ejemplo:**
+```graphql
+mutation {
+  createPost(title: "New Post", body: "This is the content of the new post") {
+    id
+    title
+  }
+}
+```

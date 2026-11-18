@@ -76,7 +76,6 @@ Dentro encontramos el archivo `info.txt`, que contiene una referencia a la image
 
 **Hallazgo:** el acceso inicial está relacionado con el análisis de una copia de seguridad de Windows, no con la explotación directa de un servicio web.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://exploitnotes.hashnode.dev\&sz=32)
 
 ExploitNotes
 
@@ -117,7 +116,6 @@ La contraseña recuperada en el es: `********************`.
 
 Esto permite desbloquear el disco, pero todavía necesitamos acceder a una cuenta de Windows.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://exploitnotes.hashnode.dev\&sz=32)
 
 ExploitNotes
 
@@ -182,7 +180,6 @@ Contraseña: Napping2Curator
 
 Esta cuenta se utiliza en una tarea de respaldo mediante SFTP, por lo que constituye el siguiente objetivo para conseguir acceso al servidor Linux.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://exploitnotes.hashnode.dev\&sz=32)
 
 ExploitNotes
 
@@ -295,7 +292,6 @@ Ya tenemos acceso al servidor Linux, aunque todavía sin privilegios de administ
 
 **Vulnerabilidad identificada:** configuración insegura de `ForceCommand`, debido a que el script de restricción es modificable por el propio usuario restringido.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://exploitnotes.hashnode.dev\&sz=32)
 
 ExploitNotes
 
@@ -394,8 +390,6 @@ El ataque consiste en crear una versión modificada del bytecode que conserve un
 Cuando la tarea programada ejecuta `app.py`, Python importa el módulo y ejecuta el código alterado con los privilegios del proceso.
 
 Se confirma que la validación basada en fecha de modificación y tamaño del código fuente permite reutilizar un `.pyc` manipulado sin modificar directamente `helper.py`.&#x20;
-
-[image](https://www.google.com/s2/favicons?domain=https://exploitnotes.hashnode.dev\&sz=32)
 
 ExploitNotes
 

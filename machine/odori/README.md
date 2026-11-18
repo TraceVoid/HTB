@@ -407,7 +407,7 @@ Code execution with root privileges
 
 To avoid manually modifying the bytecode and its header, we use the `odori_privesc.py` script prepared during the exploitation process.
 ```
-git clone https://github.com/TraceVoid/HTB/machine/odori/odori_privesc.py
+wget https://raw.githubusercontent.com/TraceVoid/HTB/main/machine/odori/odori_privesc.py
 ```
 
 On Parrot OS, we start a temporary HTTP server:

